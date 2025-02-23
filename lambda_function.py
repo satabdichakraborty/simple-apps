@@ -63,14 +63,30 @@ def insert_to_dynamodb(table, items: list) -> Dict[str, int]:
 def process_excel_row(row) -> Dict[str, str]:
     """Convert DataFrame row to DynamoDB item"""
     return {
+        'QuestionId': str(row['QuestionId']),
+        'Type': str(row['Type']),
+        'Status': str(row['Status']),
         'Question': str(row['Question']),
+        'Key': str(row['Key']),
+        'Notes': str(row['Notes']),
+        'Rationale': str(row['Rationale']),
+        'CreatedDate': str(row['Created Date']),
+        'CreatedBy': str(row['Created By']),
         'ResponseA': str(row['Response A']),
         'ResponseB': str(row['Response B']),
         'ResponseC': str(row['Response C']),
         'ResponseD': str(row['Response D']),
+        'ResponseE': str(row['Response E']),
+        'ResponseF': str(row['Response F']),
+        'RationaleA': str(row['Rationale A']),
+        'RationaleB': str(row['Rationale B']),
+        'RationaleC': str(row['Rationale C']),
+        'RationaleD': str(row['Rationale D']),
+        'RationaleE': str(row['Rationale E']),
+        'RationaleF': str(row['Rationale F']),
         'Topic': str(row['Topic']),
-        'Knowledge': str(row['Knowledge']),
-        'Tag': str(row['Tag']),
+        'Knowledge': str(row['CLF-002-Knowledge-Skills']),
+        'Tag': str(row['CLF-002-Tagging System']),
         'ProcessedAt': datetime.now().isoformat()
     }
 
