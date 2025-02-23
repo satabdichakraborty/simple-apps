@@ -14,8 +14,12 @@ logger.setLevel(logging.INFO)
 
 # Get environment variables
 S3_BUCKET_NAME = os.environ.get('S3_BUCKET_NAME')
+DYNAMODB_TABLE_NAME = os.environ.get('DYNAMODB_TABLE_NAME')
+
 if not S3_BUCKET_NAME:
     raise ValueError("S3_BUCKET_NAME environment variable is not set")
+if not DYNAMODB_TABLE_NAME:
+    raise ValueError("DYNAMODB_TABLE_NAME environment variable is not set")
 
 def setup_aws_clients():
     """Initialize AWS service clients"""
@@ -77,7 +81,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     try:
         # Initialize AWS clients
         s3_client, dynamodb = setup_aws_clients()
-        table = dynamodb.Table('CLF_Items')
+        table = dynamodb.Table(DYNAMODB_TABLE_NAME)
         
         # Get S3 event details
         file_key = event['Records'][0]['s3']['object']['key']
