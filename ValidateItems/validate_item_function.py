@@ -22,36 +22,41 @@ def setup_dynamodb():
 
 def format_question(item: Dict[str, Any]) -> Dict[str, Any]:
     """Format a question with its non-empty answers"""
-    # Get all possible responses
-    responses = {
-        'A': item.get('ResponseA', ''),
-        'B': item.get('ResponseB', ''),
-        'C': item.get('ResponseC', ''),
-        'D': item.get('ResponseD', ''),
-        'E': item.get('ResponseE', ''),
-        'F': item.get('ResponseF', '')
-    }
-    
-    # Filter out empty responses
-    non_empty_responses = {
-        key: value for key, value in responses.items() 
-        if value and value.strip()
-    }
-    
-    # Format the question text with answers
-    formatted_text = f"Question: {item.get('Question', '')}\n\n"
-    for key, value in non_empty_responses.items():
-        formatted_text += f"{key}) {value}\n"
-    
-    return {
-        'QuestionId': item.get('QuestionId', ''),
-        'FormattedText': formatted_text,
-        'Type': item.get('Type', ''),
-        'Status': item.get('Status', ''),
-        'Key': item.get('Key', ''),
-        'Topic': item.get('Topic', ''),
-        'ResponseCount': len(non_empty_responses)
-    }
+    try:
+        # Get all possible responses and handle 'nan' values
+        responses = {
+            'A': str(item.get('ResponseA', '')),
+            'B': str(item.get('ResponseB', '')),
+            'C': str(item.get('ResponseC', '')),
+            'D': str(item.get('ResponseD', '')),
+            'E': str(item.get('ResponseE', '')),
+            'F': str(item.get('ResponseF', ''))
+        }
+        
+        # Filter out empty responses and 'nan'
+        non_empty_responses = {
+            key: value for key, value in responses.items() 
+            if value and value.strip() and value.lower() != 'nan'
+        }
+        
+        # Format the question text with answers
+        formatted_text = f"Question: {item.get('Question', '')}\n\n"
+        for key, value in non_empty_responses.items():
+            formatted_text += f"{key}) {value}\n"
+        
+        return {
+            'QuestionId': str(item.get('QuestionId', '')),
+            'FormattedText': formatted_text,
+            'Type': str(item.get('Type', '')),
+            'Status': str(item.get('Status', '')),
+            'Key': str(item.get('Key', '')),
+            'Topic': str(item.get('Topic', '')),
+            'ResponseCount': len(non_empty_responses)
+        }
+    except Exception as e:
+        logger.error(f"Error formatting question: {str(e)}")
+        logger.error(f"Problematic item: {item}")
+        raise
 
 def get_formatted_questions(table) -> List[Dict[str, Any]]:
     """Read and format questions from DynamoDB table"""
