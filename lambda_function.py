@@ -31,18 +31,18 @@ def setup_aws_clients():
         logger.error(f"Failed to initialize AWS clients: {str(e)}")
         raise
 
-def read_excel_from_s3(s3_client, bucket: str, key: str) -> pd.DataFrame:
-    """Read Excel file from S3 and return DataFrame"""
+def read_csv_from_s3(s3_client, bucket: str, key: str) -> pd.DataFrame:
+    """Read CSV file from S3 and return DataFrame"""
     try:
         logger.info(f"Reading file {key} from bucket {bucket}")
         response = s3_client.get_object(Bucket=bucket, Key=key)
-        excel_data = response['Body'].read()
-        return pd.read_excel(io.BytesIO(excel_data))
+        csv_data = response['Body'].read().decode('utf-8')
+        return pd.read_csv(io.StringIO(csv_data))
     except ClientError as e:
         logger.error(f"S3 operation failed: {str(e)}")
         raise
     except Exception as e:
-        logger.error(f"Failed to process Excel file: {str(e)}")
+        logger.error(f"Failed to process CSV file: {str(e)}")
         raise
 
 def insert_to_dynamodb(table, items: list) -> Dict[str, int]:
@@ -60,7 +60,7 @@ def insert_to_dynamodb(table, items: list) -> Dict[str, int]:
     
     return {'success': success_count, 'errors': error_count}
 
-def process_excel_row(row) -> Dict[str, str]:
+def process_csv_row(row) -> Dict[str, str]:
     """Convert DataFrame row to DynamoDB item"""
     return {
         'QuestionId': str(row['QuestionId']),
@@ -92,7 +92,7 @@ def process_excel_row(row) -> Dict[str, str]:
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     start_time = time.time()
-    logger.info("Starting Excel processing Lambda function")
+    logger.info("Starting CSV processing Lambda function")
     
     try:
         # Initialize AWS clients
@@ -103,12 +103,12 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         file_key = event['Records'][0]['s3']['object']['key']
         logger.info(f"Processing file: {file_key} from bucket: {S3_BUCKET_NAME}")
         
-        # Read and process Excel file
-        df = read_excel_from_s3(s3_client, S3_BUCKET_NAME, file_key)
-        logger.info(f"Successfully read Excel file with {len(df)} rows")
+        # Read and process CSV file
+        df = read_csv_from_s3(s3_client, S3_BUCKET_NAME, file_key)
+        logger.info(f"Successfully read CSV file with {len(df)} rows")
         
         # Process rows and prepare items for DynamoDB
-        items = [process_excel_row(row) for _, row in df.iterrows()]
+        items = [process_csv_row(row) for _, row in df.iterrows()]
         
         # Insert to DynamoDB
         results = insert_to_dynamodb(table, items)
