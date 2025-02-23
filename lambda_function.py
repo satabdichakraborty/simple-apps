@@ -37,7 +37,12 @@ def read_csv_from_s3(s3_client, bucket: str, key: str) -> pd.DataFrame:
         logger.info(f"Reading file {key} from bucket {bucket}")
         response = s3_client.get_object(Bucket=bucket, Key=key)
         csv_data = response['Body'].read().decode('utf-8')
-        return pd.read_csv(io.StringIO(csv_data))
+        df = pd.read_csv(io.StringIO(csv_data))
+        
+        # Log column names for debugging
+        logger.info(f"CSV columns found: {list(df.columns)}")
+        
+        return df
     except ClientError as e:
         logger.error(f"S3 operation failed: {str(e)}")
         raise
@@ -62,33 +67,38 @@ def insert_to_dynamodb(table, items: list) -> Dict[str, int]:
 
 def process_csv_row(row) -> Dict[str, str]:
     """Convert DataFrame row to DynamoDB item"""
-    return {
-        'QuestionId': str(row['QuestionId']),
-        'Type': str(row['Type']),
-        'Status': str(row['Status']),
-        'Question': str(row['Question']),
-        'Key': str(row['Key']),
-        'Notes': str(row['Notes']),
-        'Rationale': str(row['Rationale']),
-        'CreatedDate': str(row['Created Date']),
-        'CreatedBy': str(row['Created By']),
-        'ResponseA': str(row['Response A']),
-        'ResponseB': str(row['Response B']),
-        'ResponseC': str(row['Response C']),
-        'ResponseD': str(row['Response D']),
-        'ResponseE': str(row['Response E']),
-        'ResponseF': str(row['Response F']),
-        'RationaleA': str(row['Rationale A']),
-        'RationaleB': str(row['Rationale B']),
-        'RationaleC': str(row['Rationale C']),
-        'RationaleD': str(row['Rationale D']),
-        'RationaleE': str(row['Rationale E']),
-        'RationaleF': str(row['Rationale F']),
-        'Topic': str(row['Topic']),
-        'Knowledge': str(row['CLF-002-Knowledge-Skills']),
-        'Tag': str(row['CLF-002-Tagging System']),
-        'ProcessedAt': datetime.now().isoformat()
-    }
+    try:
+        return {
+            'QuestionId': str(row['QuestionId']),
+            'Type': str(row['Type']),
+            'Status': str(row['Status']),
+            'Question': str(row['Question']),
+            'Key': str(row['Key']),
+            'Notes': str(row.get('Notes', '')),
+            'Rationale': str(row.get('Rationale', '')),
+            'CreatedDate': str(row.get('Created Date', '')),
+            'CreatedBy': str(row.get('Created By', '')),
+            'ResponseA': str(row.get('Response A', '')),
+            'ResponseB': str(row.get('Response B', '')),
+            'ResponseC': str(row.get('Response C', '')),
+            'ResponseD': str(row.get('Response D', '')),
+            'ResponseE': str(row.get('Response E', '')),
+            'ResponseF': str(row.get('Response F', '')),
+            'RationaleA': str(row.get('Rationale A', '')),
+            'RationaleB': str(row.get('Rationale B', '')),
+            'RationaleC': str(row.get('Rationale C', '')),
+            'RationaleD': str(row.get('Rationale D', '')),
+            'RationaleE': str(row.get('Rationale E', '')),
+            'RationaleF': str(row.get('Rationale F', '')),
+            'Topic': str(row.get('Topic', '')),
+            'Knowledge': str(row.get('CLF-002-Knowledge-Skills', '')),
+            'Tag': str(row.get('CLF-002-Tagging-System', '')),
+            'ProcessedAt': datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Error processing row: {row}")
+        logger.error(f"Available columns: {row.keys()}")
+        raise Exception(f"Failed to process row: {str(e)}")
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     start_time = time.time()
