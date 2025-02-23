@@ -54,16 +54,41 @@ def insert_to_dynamodb(table, items: list) -> Dict[str, int]:
     """Batch insert items to DynamoDB with error tracking"""
     success_count = 0
     error_count = 0
+    error_details = []
     
     for item in items:
         try:
+            # Log the item being inserted
+            logger.info(f"Attempting to insert item with QuestionId: {item.get('QuestionId', 'No ID')}")
+            
+            # Validate required fields
+            if not item.get('QuestionId'):
+                raise ValueError("QuestionId is required")
+                
             table.put_item(Item=item)
             success_count += 1
+            logger.info(f"Successfully inserted item with QuestionId: {item.get('QuestionId')}")
+            
         except Exception as e:
             error_count += 1
-            logger.error(f"Failed to insert item: {str(e)}\nItem: {item}")
+            error_detail = {
+                'QuestionId': item.get('QuestionId', 'Unknown'),
+                'error': str(e)
+            }
+            error_details.append(error_detail)
+            logger.error(f"Failed to insert item: {str(e)}")
+            logger.error(f"Problematic item: {item}")
     
-    return {'success': success_count, 'errors': error_count}
+    # Log summary
+    logger.info(f"Insert Summary - Success: {success_count}, Failures: {error_count}")
+    if error_details:
+        logger.error(f"Error Details: {error_details}")
+    
+    return {
+        'success': success_count, 
+        'errors': error_count,
+        'error_details': error_details
+    }
 
 def process_csv_row(row) -> Dict[str, str]:
     """Convert DataFrame row to DynamoDB item"""
@@ -126,7 +151,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Calculate processing time
         processing_time = time.time() - start_time
         
-        # Prepare response
+        # Prepare response with error details
         response = {
             'statusCode': 200,
             'body': {
@@ -134,10 +159,12 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'total_rows': len(df),
                 'successful_inserts': results['success'],
                 'failed_inserts': results['errors'],
+                'error_details': results.get('error_details', []),
                 'processing_time_seconds': round(processing_time, 2)
             }
         }
         
+        # Log complete response
         logger.info(f"Processing completed: {response}")
         return response
         
