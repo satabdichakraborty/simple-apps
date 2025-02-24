@@ -27,8 +27,20 @@ def setup_aws_clients():
 def get_questions_from_dynamodb(table) -> List[Dict[str, Any]]:
     """Read questions from DynamoDB"""
     try:
-        response = table.scan()
-        return response.get('Items', [])
+        # Specify the attributes to get
+        response = table.scan(
+            ProjectionExpression='QuestionId, Question, ResponseA, ResponseB, ResponseC, ResponseD, ResponseE, ResponseF'
+        )
+        items = response.get('Items', [])
+        
+        # Log the retrieved questions
+        for item in items:
+            logger.info(f"Retrieved question - ID: {item.get('QuestionId', 'No ID')}")
+            
+        return items
+    except ClientError as e:
+        logger.error(f"DynamoDB ClientError: {str(e)}")
+        raise
     except Exception as e:
         logger.error(f"Error reading from DynamoDB: {str(e)}")
         raise
@@ -36,6 +48,10 @@ def get_questions_from_dynamodb(table) -> List[Dict[str, Any]]:
 def validate_question(client, question: Dict[str, Any]) -> Dict[str, Any]:
     """Validate a single question using Claude"""
     try:
+        # Get question ID first
+        question_id = question.get('QuestionId', 'Unknown ID')
+        logger.info(f"\nProcessing Question ID: {question_id}")
+        
         # Format the question and answers
         question_text = question.get('Question', '')
         answers = {
@@ -46,6 +62,10 @@ def validate_question(client, question: Dict[str, Any]) -> Dict[str, Any]:
             'E': question.get('ResponseE', ''),
             'F': question.get('ResponseF', '')
         }
+        
+        # Log question details
+        logger.info(f"Question Text: {question_text}")
+        logger.info(f"Available Answers: {len([v for v in answers.values() if v and v.strip() and v.lower() != 'nan'])}")
         
         # Filter out empty answers
         valid_answers = {k: v for k, v in answers.items() if v and v.strip() and v.lower() != 'nan'}
