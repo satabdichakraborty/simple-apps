@@ -50,7 +50,7 @@ def validate_question(client, question: Dict[str, Any]) -> Dict[str, Any]:
         # Filter out empty answers
         valid_answers = {k: v for k, v in answers.items() if v and v.strip() and v.lower() != 'nan'}
         
-        # Create the prompt
+        # Create the prompt with stronger JSON formatting instruction
         answers_text = "\n".join([f"{k}) {v}" for k, v in valid_answers.items()])
         prompt = f"""As an AWS certification expert, analyze this question and provide the correct answer with explanation.
 
@@ -59,14 +59,14 @@ Question: {question_text}
 Options:
 {answers_text}
 
-Please provide your response in this JSON format:
+Respond ONLY with a JSON object in this exact format, no other text:
 {{
-    "correct_option": "A/B/C/D/E/F",
-    "explanation": "Your detailed explanation here",
-    "confidence": "HIGH/MEDIUM/LOW"
+    "correct_option": "<single letter A/B/C/D/E/F>",
+    "explanation": "<your detailed explanation>",
+    "confidence": "<HIGH/MEDIUM/LOW>"
 }}
 
-Be very specific about why the chosen answer is correct and why others are incorrect."""
+The response must be valid JSON. Do not include any text outside the JSON object."""
 
         # Format the request payload
         native_request = {
@@ -79,6 +79,7 @@ Be very specific about why the chosen answer is correct and why others are incor
                     "content": [{"type": "text", "text": prompt}],
                 }
             ],
+            "system": "You are an AWS certification expert. Always respond with valid JSON only."
         }
         
         # Invoke Claude
@@ -91,23 +92,41 @@ Be very specific about why the chosen answer is correct and why others are incor
         model_response = json.loads(response["body"].read())
         response_text = model_response["content"][0]["text"]
         
+        # Log the raw response for debugging
+        logger.info(f"Raw Claude response: {response_text}")
+        
+        # Clean the response text - remove any non-JSON content
+        response_text = response_text.strip()
+        if response_text.startswith('```json'):
+            response_text = response_text.split('```json')[1]
+        if response_text.endswith('```'):
+            response_text = response_text.split('```')[0]
+        response_text = response_text.strip()
+        
         try:
             # Parse the JSON response
             claude_answer = json.loads(response_text)
+            
+            # Validate JSON structure
+            required_fields = ['correct_option', 'explanation', 'confidence']
+            if not all(field in claude_answer for field in required_fields):
+                raise ValueError("Missing required fields in response")
+                
             return {
                 "questionId": question.get('QuestionId', ''),
                 "question": question_text,
                 "validation": claude_answer,
                 "status": "success"
             }
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as je:
             logger.error(f"Failed to parse Claude's response as JSON: {response_text}")
+            logger.error(f"JSON error: {str(je)}")
             return {
                 "questionId": question.get('QuestionId', ''),
                 "question": question_text,
                 "validation": {
                     "correct_option": "ERROR",
-                    "explanation": "Failed to parse response",
+                    "explanation": f"Failed to parse response: {str(je)}",
                     "confidence": "LOW"
                 },
                 "status": "error"
