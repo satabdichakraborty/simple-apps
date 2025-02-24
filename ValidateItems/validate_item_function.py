@@ -11,7 +11,7 @@ logger.setLevel(logging.INFO)
 
 # Get environment variables
 TABLE_NAME = os.environ.get('TABLE_NAME')
-BEDROCK_MODEL_ID = "anthropic.claude-v2"  # Claude model ID
+BEDROCK_MODEL_ID = "anthropic.claude-3-sonnet-20240229-v1:0"  # Claude 3.5 Sonnet model ID
 
 def setup_aws_clients():
     """Initialize AWS service clients"""
@@ -24,7 +24,7 @@ def setup_aws_clients():
         raise
 
 def get_claude_response(bedrock_runtime, question: str, options: Dict[str, str]) -> Dict[str, Any]:
-    """Get answer from Claude model"""
+    """Get answer from Claude 3.5 Sonnet model"""
     try:
         # Format the prompt
         options_text = "\n".join([f"{key}) {value}" for key, value in options.items()])
@@ -40,21 +40,29 @@ Please provide your response in this JSON format:
     "correct_option": "A/B/C/D/E/F",
     "explanation": "Your detailed explanation here"
 }}
+
+Be very specific about why the chosen answer is correct and why others are incorrect.
 """
 
-        # Call Bedrock with Claude
+        # Call Bedrock with Claude 3.5 Sonnet
         response = bedrock_runtime.invoke_model(
             modelId=BEDROCK_MODEL_ID,
             body=json.dumps({
-                "prompt": f"\n\nHuman: {prompt}\n\nAssistant:",
+                "anthropic_version": "bedrock-2024-02-29",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
                 "max_tokens": 2048,
                 "temperature": 0.0
             })
         )
         
-        # Parse response
+        # Parse response for Claude 3.5
         response_body = json.loads(response['body'].read())
-        claude_response = json.loads(response_body['completion'])
+        claude_response = json.loads(response_body['content'][0]['text'])
         
         return claude_response
         
