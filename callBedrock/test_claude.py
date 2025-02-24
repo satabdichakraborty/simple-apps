@@ -4,6 +4,7 @@ import logging
 from botocore.exceptions import ClientError
 from typing import Dict, List, Any
 import os
+from datetime import datetime
 
 # Configure logging
 logger = logging.getLogger()
@@ -12,7 +13,8 @@ logger.setLevel(logging.INFO)
 # Constants
 MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
 REGION = "us-east-1"
-TABLE_NAME = os.environ.get('TABLE_NAME')
+SOURCE_TABLE_NAME = os.environ.get('TABLE_NAME')
+RESULTS_TABLE_NAME = os.environ.get('LLM_RESULTS_TABLE')
 
 def setup_aws_clients():
     """Initialize AWS clients"""
@@ -23,6 +25,33 @@ def setup_aws_clients():
     except Exception as e:
         logger.error(f"Failed to initialize AWS clients: {str(e)}")
         raise
+
+def store_validation_result(table, result: Dict[str, Any]) -> bool:
+    """Store validation result in DynamoDB"""
+    try:
+        # Extract validation data
+        validation = result.get('validation', {})
+        
+        # Prepare item for DynamoDB
+        item = {
+            'QuestionId': result['questionId'],
+            'CorrectOption': validation.get('correct_option', 'UNKNOWN'),
+            'Explanation': validation.get('explanation', ''),
+            'Confidence': validation.get('confidence', 'LOW'),
+            'ValidationStatus': result.get('status', 'error'),
+            'ProcessedAt': datetime.now().isoformat(),
+            'QuestionText': result.get('question', '')
+        }
+        
+        # Store in DynamoDB
+        table.put_item(Item=item)
+        logger.info(f"Stored validation result for QuestionId: {result['questionId']}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Failed to store validation result: {str(e)}")
+        logger.error(f"Result data: {result}")
+        return False
 
 def get_questions_from_dynamodb(table) -> List[Dict[str, Any]]:
     """Read questions from DynamoDB"""
@@ -166,23 +195,36 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     
     try:
         # Validate environment variables
-        if not TABLE_NAME:
+        if not SOURCE_TABLE_NAME:
             raise ValueError("TABLE_NAME environment variable is not set")
+        if not RESULTS_TABLE_NAME:
+            raise ValueError("LLM_RESULTS_TABLE environment variable is not set")
             
         # Initialize AWS clients
         dynamodb, bedrock = setup_aws_clients()
-        table = dynamodb.Table(TABLE_NAME)
+        source_table = dynamodb.Table(SOURCE_TABLE_NAME)
+        results_table = dynamodb.Table(RESULTS_TABLE_NAME)
         
         # Get questions from DynamoDB
-        questions = get_questions_from_dynamodb(table)
+        questions = get_questions_from_dynamodb(source_table)
         logger.info(f"Found {len(questions)} questions to validate")
         
-        # Validate each question
+        # Validate each question and store results
         validation_results = []
+        storage_results = []
         for question in questions:
+            # Get validation result
             result = validate_question(bedrock, question)
             validation_results.append(result)
-            logger.info(f"Validated question {result['questionId']}: {result['status']}")
+            
+            # Store result in results table
+            storage_success = store_validation_result(results_table, result)
+            storage_results.append({
+                'questionId': result['questionId'],
+                'stored': storage_success
+            })
+            
+            logger.info(f"Validated and stored question {result['questionId']}: {result['status']}")
         
         # Prepare response
         response = {
@@ -191,9 +233,10 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'Content-Type': 'application/json'
             },
             'body': json.dumps({
-                'message': 'Questions validated',
+                'message': 'Questions validated and stored',
                 'total_questions': len(questions),
-                'results': validation_results
+                'validation_results': validation_results,
+                'storage_results': storage_results
             }, indent=2)
         }
         
