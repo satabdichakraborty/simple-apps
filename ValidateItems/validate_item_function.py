@@ -56,18 +56,34 @@ Be very specific about why the chosen answer is correct and why others are incor
                     }
                 ],
                 "max_tokens": 2048,
-                "temperature": 0.0
+                "temperature": 0.0,
+                "system": "You are an AWS certification expert. Always respond in valid JSON format."
             })
         )
         
         # Parse response for Claude 3.5
         response_body = json.loads(response['body'].read())
-        claude_response = json.loads(response_body['content'][0]['text'])
+        response_text = response_body.get('content', [{}])[0].get('text', '{}')
+        
+        # Add error handling for JSON parsing
+        try:
+            claude_response = json.loads(response_text)
+            if not isinstance(claude_response, dict):
+                raise ValueError("Response is not a dictionary")
+            if 'correct_option' not in claude_response or 'explanation' not in claude_response:
+                raise ValueError("Response missing required fields")
+        except json.JSONDecodeError:
+            logger.error(f"Failed to parse JSON response: {response_text}")
+            return {
+                "correct_option": "Error",
+                "explanation": "Failed to parse Claude's response as JSON"
+            }
         
         return claude_response
         
     except Exception as e:
         logger.error(f"Error getting Claude response: {str(e)}")
+        logger.error(f"Full error details: ", exc_info=True)
         return {
             "correct_option": "Error",
             "explanation": f"Failed to get answer: {str(e)}"
