@@ -69,21 +69,23 @@ def compare_tables() -> Dict[str, Any]:
         source_table = dynamodb.Table(SOURCE_TABLE)
         results_table = dynamodb.Table(RESULTS_TABLE)
         
-        # Get items from both tables
+        # Get items from both tables - now including Explanation
         source_items = get_table_items(source_table, ['QuestionId', 'Key'])
-        results_items = get_table_items(results_table, ['QuestionId', 'CorrectOption'])
+        results_items = get_table_items(results_table, ['QuestionId', 'CorrectOption', 'Explanation'])
         
         # Create dictionaries for easier lookup
         source_dict = {item['QuestionId']: item.get('Key', '').strip() for item in source_items}
         
-        # Handle comma-separated values in results table and store all options
+        # Handle comma-separated values and store all options and explanations
         results_dict = {}
-        all_options_dict = {}  # Store complete CorrectOption string
+        all_options_dict = {}
+        explanations_dict = {}  # New dictionary for explanations
         for item in results_items:
             qid = item['QuestionId']
             correct_options = item.get('CorrectOption', '').split(',')
             results_dict[qid] = correct_options[0].strip() if correct_options else ''
-            all_options_dict[qid] = item.get('CorrectOption', '')  # Store complete string
+            all_options_dict[qid] = item.get('CorrectOption', '')
+            explanations_dict[qid] = item.get('Explanation', '')  # Store explanation
         
         # Initialize comparison results
         matches = 0
@@ -116,7 +118,8 @@ def compare_tables() -> Dict[str, Any]:
                     "matches": matches_flag,
                     "table1_key": source_key,
                     "table2_correctoption": result_key,
-                    "table2_all_options": all_options_dict.get(question_id, '') if not matches_flag else ''  # Use stored options
+                    "table2_all_options": all_options_dict.get(question_id, ''),
+                    "explanation": explanations_dict.get(question_id, '') if not matches_flag else ''  # Add explanation only for mismatches
                 })
             
             # Case 2: Question missing from source table
@@ -146,13 +149,14 @@ def save_to_s3(comparison_results: Dict[str, Any]) -> str:
         output = StringIO()
         writer = csv.writer(output)
         
-        # Write headers
+        # Write headers - added Explanation
         writer.writerow([
             'QuestionId',
             'Matches',
             'Table1_Key',
             'Table2_CorrectOption',
             'Table2_All_Options',
+            'Explanation',  # New column
             'Status'
         ])
         
@@ -164,16 +168,19 @@ def save_to_s3(comparison_results: Dict[str, Any]) -> str:
                 detail['table1_key'],
                 detail['table2_correctoption'],
                 detail.get('table2_all_options', ''),
+                detail.get('explanation', ''),  # Add explanation to CSV
                 'Match' if detail['matches'] else 'Mismatch'
             ])
         
-        # Write missing items
+        # Write missing items - now with empty explanation field
         for question_id in comparison_results['missing_from_table1']:
             writer.writerow([
                 question_id,
                 'N/A',
                 'MISSING',
                 'EXISTS',
+                '',
+                '',  # Empty explanation
                 'Missing from Table 1'
             ])
             
@@ -183,6 +190,8 @@ def save_to_s3(comparison_results: Dict[str, Any]) -> str:
                 'N/A',
                 'EXISTS',
                 'MISSING',
+                '',
+                '',  # Empty explanation
                 'Missing from Table 2'
             ])
         
