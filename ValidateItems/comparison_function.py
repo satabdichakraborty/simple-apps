@@ -70,12 +70,18 @@ def compare_tables() -> Dict[str, Any]:
         results_table = dynamodb.Table(RESULTS_TABLE)
         
         # Get items from both tables
-        source_items = get_table_items(source_table, ['QuestionId', 'Key'])  # Changed to 'Key'
+        source_items = get_table_items(source_table, ['QuestionId', 'Key'])
         results_items = get_table_items(results_table, ['QuestionId', 'CorrectOption'])
         
         # Create dictionaries for easier lookup
-        source_dict = {item['QuestionId']: item.get('Key', '') for item in source_items}  # Changed to 'Key'
-        results_dict = {item['QuestionId']: item.get('CorrectOption', '') for item in results_items}
+        source_dict = {item['QuestionId']: item.get('Key', '').strip() for item in source_items}
+        
+        # Handle comma-separated values in results table
+        results_dict = {}
+        for item in results_items:
+            correct_options = item.get('CorrectOption', '').split(',')
+            # Take first answer if multiple exist and clean it
+            results_dict[item['QuestionId']] = correct_options[0].strip() if correct_options else ''
         
         # Initialize comparison results
         matches = 0
@@ -93,7 +99,11 @@ def compare_tables() -> Dict[str, Any]:
             
             # Case 1: Question exists in both tables
             if source_key is not None and result_key is not None:
-                matches_flag = source_key.upper() == result_key.upper()
+                # Clean and compare values
+                source_key = source_key.strip().upper()
+                result_key = result_key.strip().upper()
+                
+                matches_flag = source_key == result_key
                 if matches_flag:
                     matches += 1
                 else:
@@ -103,7 +113,8 @@ def compare_tables() -> Dict[str, Any]:
                     "questionid": question_id,
                     "matches": matches_flag,
                     "table1_key": source_key,
-                    "table2_correctoption": result_key
+                    "table2_correctoption": result_key,
+                    "table2_all_options": item.get('CorrectOption', '') if not matches_flag else ''  # Show all options only for mismatches
                 })
             
             # Case 2: Question missing from source table
@@ -130,7 +141,6 @@ def compare_tables() -> Dict[str, Any]:
 def save_to_s3(comparison_results: Dict[str, Any]) -> str:
     """Save comparison results to CSV in S3"""
     try:
-        # Create CSV in memory
         output = StringIO()
         writer = csv.writer(output)
         
@@ -140,6 +150,7 @@ def save_to_s3(comparison_results: Dict[str, Any]) -> str:
             'Matches',
             'Table1_Key',
             'Table2_CorrectOption',
+            'Table2_All_Options',
             'Status'
         ])
         
@@ -150,6 +161,7 @@ def save_to_s3(comparison_results: Dict[str, Any]) -> str:
                 detail['matches'],
                 detail['table1_key'],
                 detail['table2_correctoption'],
+                detail.get('table2_all_options', ''),
                 'Match' if detail['matches'] else 'Mismatch'
             ])
         
