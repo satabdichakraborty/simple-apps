@@ -117,8 +117,7 @@ def compare_tables() -> Dict[str, Any]:
                     "table1_key": source_key,
                     "table2_correctoption": result_key,
                     "table2_all_options": results_dict.get(question_id, '') if not matches_flag else '',
-                    "explanation": explanations_dict.get(question_id, '') if not matches_flag else '',
-                    "table2_all_options_explanation": results_dict.get(question_id, '') if not matches_flag else ''
+                    "explanation": explanations_dict.get(question_id, '') if not matches_flag else ''
                 })
             
             # Case 2: Question missing from source table
