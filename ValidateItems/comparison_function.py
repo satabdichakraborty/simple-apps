@@ -4,6 +4,9 @@ import logging
 from typing import Dict, List, Any
 import os
 from botocore.exceptions import ClientError
+import csv
+from io import StringIO
+from datetime import datetime
 
 # Configure logging
 logger = logging.getLogger()
@@ -12,6 +15,7 @@ logger.setLevel(logging.INFO)
 # Get environment variables
 SOURCE_TABLE = os.environ.get('SOURCE_TABLE')  # Table with 'key' field
 RESULTS_TABLE = os.environ.get('RESULTS_TABLE')  # Table with 'correctoption' field
+OUTPUT_BUCKET = os.environ.get('OUTPUT_BUCKET')
 
 def setup_dynamodb():
     """Initialize DynamoDB resource"""
@@ -123,17 +127,85 @@ def compare_tables() -> Dict[str, Any]:
         logger.error(f"Error during comparison: {str(e)}")
         raise
 
+def save_to_s3(comparison_results: Dict[str, Any]) -> str:
+    """Save comparison results to CSV in S3"""
+    try:
+        # Create CSV in memory
+        output = StringIO()
+        writer = csv.writer(output)
+        
+        # Write headers
+        writer.writerow([
+            'QuestionId',
+            'Matches',
+            'Table1_Key',
+            'Table2_CorrectOption',
+            'Status'
+        ])
+        
+        # Write comparison details
+        for detail in comparison_results['comparison_details']:
+            writer.writerow([
+                detail['questionid'],
+                detail['matches'],
+                detail['table1_key'],
+                detail['table2_correctoption'],
+                'Match' if detail['matches'] else 'Mismatch'
+            ])
+        
+        # Write missing items
+        for question_id in comparison_results['missing_from_table1']:
+            writer.writerow([
+                question_id,
+                'N/A',
+                'MISSING',
+                'EXISTS',
+                'Missing from Table 1'
+            ])
+            
+        for question_id in comparison_results['missing_from_table2']:
+            writer.writerow([
+                question_id,
+                'N/A',
+                'EXISTS',
+                'MISSING',
+                'Missing from Table 2'
+            ])
+        
+        # Generate filename with timestamp
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'comparison_results_{timestamp}.csv'
+        
+        # Upload to S3
+        s3_client = boto3.client('s3')
+        s3_client.put_object(
+            Bucket=OUTPUT_BUCKET,
+            Key=filename,
+            Body=output.getvalue(),
+            ContentType='text/csv'
+        )
+        
+        logger.info(f"Saved comparison results to s3://{OUTPUT_BUCKET}/{filename}")
+        return filename
+        
+    except Exception as e:
+        logger.error(f"Error saving to S3: {str(e)}")
+        raise
+
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """Main Lambda handler"""
     logger.info("Starting DynamoDB Table Comparison")
     
     try:
         # Validate environment variables
-        if not SOURCE_TABLE or not RESULTS_TABLE:
+        if not all([SOURCE_TABLE, RESULTS_TABLE, OUTPUT_BUCKET]):
             raise ValueError("Required environment variables are not set")
         
         # Perform comparison
         comparison_results = compare_tables()
+        
+        # Save results to S3
+        output_file = save_to_s3(comparison_results)
         
         # Prepare response
         response = {
@@ -143,7 +215,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             },
             'body': json.dumps({
                 'message': 'Comparison completed successfully',
-                'results': comparison_results
+                'results': comparison_results,
+                'output_file': f"s3://{OUTPUT_BUCKET}/{output_file}"
             }, indent=2)
         }
         
@@ -153,6 +226,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         logger.info(f"Mismatches: {comparison_results['mismatches']}")
         logger.info(f"Missing from Table 1: {len(comparison_results['missing_from_table1'])}")
         logger.info(f"Missing from Table 2: {len(comparison_results['missing_from_table2'])}")
+        logger.info(f"Results saved to: {output_file}")
         
         return response
         
