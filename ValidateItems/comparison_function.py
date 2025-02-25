@@ -24,11 +24,33 @@ def setup_dynamodb():
 def get_table_items(table, attributes: List[str]) -> List[Dict[str, Any]]:
     """Get items from DynamoDB table with specified attributes"""
     try:
-        projection = ', '.join(attributes)
-        response = table.scan(
-            ProjectionExpression=projection
-        )
+        # Handle reserved word 'Key' with expression attributes
+        expression_names = {}
+        projection = []
+        
+        for attr in attributes:
+            if attr == 'Key':  # Match exact capitalization
+                expression_names['#k'] = 'Key'
+                projection.append('#k')
+            else:
+                projection.append(attr)
+        
+        # Build the projection expression
+        projection_expression = ', '.join(projection)
+        
+        # Scan with expression attribute names if needed
+        if expression_names:
+            response = table.scan(
+                ProjectionExpression=projection_expression,
+                ExpressionAttributeNames=expression_names
+            )
+        else:
+            response = table.scan(
+                ProjectionExpression=projection_expression
+            )
+            
         return response.get('Items', [])
+        
     except ClientError as e:
         logger.error(f"DynamoDB operation failed: {str(e)}")
         raise
@@ -44,11 +66,11 @@ def compare_tables() -> Dict[str, Any]:
         results_table = dynamodb.Table(RESULTS_TABLE)
         
         # Get items from both tables
-        source_items = get_table_items(source_table, ['QuestionId', '#key'])
+        source_items = get_table_items(source_table, ['QuestionId', 'Key'])  # Changed to 'Key'
         results_items = get_table_items(results_table, ['QuestionId', 'CorrectOption'])
         
         # Create dictionaries for easier lookup
-        source_dict = {item['QuestionId']: item.get('#key', '') for item in source_items}
+        source_dict = {item['QuestionId']: item.get('Key', '') for item in source_items}  # Changed to 'Key'
         results_dict = {item['QuestionId']: item.get('CorrectOption', '') for item in results_items}
         
         # Initialize comparison results
