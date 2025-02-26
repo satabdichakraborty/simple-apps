@@ -1,0 +1,45 @@
+# Lambda Function Update Request: Compare DynamoDB Tables
+
+## Task Description
+Please update the existing Lambda function file 'comparison_function.py' to compare data between two DynamoDB tables.
+
+## Database Details
+
+### Table 1
+- Name: [First table name]
+- Columns to use:
+  - QuestionId (partition key)
+  - key
+
+### Table 2
+- Name: [Second table name]
+- Columns to use:
+  - QuestionId (partition key)
+  - CorrectOption
+
+## Requirements
+1. Update the existing Lambda function to:
+   - Read records from both tables
+   - Match records by 'questionid' field
+   - Compare 'key' value from Table 1 with 'correctoption' value from Table 2
+   - Generate a comparison result
+
+2. Function should return:
+   - UnMatched records with comparison result
+   - Count of matching/non-matching records
+   - Any questionids that exist in one table but not the other
+
+3. Include appropriate error handling and logging
+
+## Example Output Format
+```json
+{
+  "matches": 15,
+  "mismatches": 3,
+  "missing_from_table1": ["id1", "id2"],
+  "missing_from_table2": ["id3"],
+  "comparison_details": [
+    {"questionid": "q1", "matches": true},
+    {"questionid": "q2", "matches": false, "table1_key": "A", "table2_correctoption": "B"}
+  ]
+}

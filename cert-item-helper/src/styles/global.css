@@ -1,0 +1,21 @@
+/* Import Cloudscape fonts */
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap');
+
+/* Reset some browser defaults */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Open Sans', sans-serif;
+  min-height: 100vh;
+  width: 100%;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+} 
