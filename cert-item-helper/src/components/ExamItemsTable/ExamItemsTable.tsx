@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Table,
   Box,
@@ -7,11 +7,12 @@ import {
   TextFilter,
   Header,
   SpaceBetween,
-  BreadcrumbGroup,
+  ButtonDropdown,
   Container,
 } from '@cloudscape-design/components';
 import { useExamItemsStore } from '../../store/examItemsStore';
 import { useExamItemsTable } from '../../hooks/useExamItemsTable';
+import CSVUpload from '../CSVUpload';
 
 const ExamItemsTable: React.FC = () => {
   const { 
@@ -31,9 +32,25 @@ const ExamItemsTable: React.FC = () => {
     handleRefresh
   } = useExamItemsTable();
 
+  const [isCSVUploadVisible, setIsCSVUploadVisible] = useState(false);
+
   useEffect(() => {
     fetchItems();
   }, [fetchItems]);
+
+  const handleAddItems = () => {
+    // Open the modal form for adding a single item
+    // This would be implemented in the parent component
+  };
+
+  const handleUploadCSV = () => {
+    setIsCSVUploadVisible(true);
+  };
+
+  const handleCSVUploadComplete = () => {
+    // Refresh the table after successful upload
+    fetchItems();
+  };
 
   return (
     <Container>
@@ -46,12 +63,22 @@ const ExamItemsTable: React.FC = () => {
                 iconName="refresh"
                 onClick={handleRefresh}
               />
-              <Button
+              <ButtonDropdown
+                items={[
+                  { id: 'add-single', text: 'Add Single Item' },
+                  { id: 'upload-csv', text: 'Upload CSV' },
+                ]}
+                onItemClick={({ detail }) => {
+                  if (detail.id === 'add-single') {
+                    handleAddItems();
+                  } else if (detail.id === 'upload-csv') {
+                    handleUploadCSV();
+                  }
+                }}
                 variant="primary"
-                iconName="add-plus"
               >
                 Add Items
-              </Button>
+              </ButtonDropdown>
             </SpaceBetween>
           }
         >
@@ -135,6 +162,13 @@ const ExamItemsTable: React.FC = () => {
               Exam Items
             </Header>
           }
+        />
+
+        {/* CSV Upload Modal */}
+        <CSVUpload 
+          visible={isCSVUploadVisible}
+          onDismiss={() => setIsCSVUploadVisible(false)}
+          onUploadComplete={handleCSVUploadComplete}
         />
       </SpaceBetween>
     </Container>
