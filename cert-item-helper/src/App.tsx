@@ -7,12 +7,16 @@ import ExamItemsPage from './pages/ExamItemsPage';
 // Apply Cloudscape theme
 applyMode('light');
 
+// Base path for the application
+const BASE_PATH = '/item-helper-app';
+
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<DashboardPage />} />
-        <Route path="/exam-items" element={<ExamItemsPage />} />
+        <Route path={`${BASE_PATH}`} element={<DashboardPage />} />
+        <Route path={`${BASE_PATH}/`} element={<DashboardPage />} />
+        <Route path={`${BASE_PATH}/exam-items`} element={<ExamItemsPage />} />
         <Route path="*" element={<DashboardPage />} />
       </Routes>
     </BrowserRouter>

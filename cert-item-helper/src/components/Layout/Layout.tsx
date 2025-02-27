@@ -7,6 +7,9 @@ import {
   TopNavigation,
 } from '@cloudscape-design/components';
 
+// Base path for the application
+const BASE_PATH = '/item-helper-app';
+
 interface LayoutProps {
   children: ReactNode;
   activeHref?: string;
@@ -17,33 +20,33 @@ const navigationItems: SideNavigationProps.Item[] = [
   {
     type: 'link',
     text: 'Dashboard',
-    href: '/',
+    href: `${BASE_PATH}/`,
   },
   {
     type: 'link',
     text: 'Exam Items',
-    href: '/exam-items',
+    href: `${BASE_PATH}/exam-items`,
   },
   {
     type: 'link',
     text: 'Practice Tests',
-    href: '/practice-tests',
+    href: `${BASE_PATH}/practice-tests`,
   },
   {
     type: 'link',
     text: 'Reports',
-    href: '/reports',
+    href: `${BASE_PATH}/reports`,
   },
   {
     type: 'link',
     text: 'Settings',
-    href: '/settings',
+    href: `${BASE_PATH}/settings`,
   },
 ];
 
 const Layout: React.FC<LayoutProps> = ({ 
   children, 
-  activeHref = '/',
+  activeHref = `${BASE_PATH}/`,
   breadcrumbs 
 }) => {
   return (
@@ -51,7 +54,7 @@ const Layout: React.FC<LayoutProps> = ({
       navigation={
         <SideNavigation
           activeHref={activeHref}
-          header={{ text: 'Cert Item Helper', href: '/' }}
+          header={{ text: 'Cert Item Helper', href: `${BASE_PATH}/` }}
           items={navigationItems}
         />
       }

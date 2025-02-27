@@ -10,13 +10,16 @@ import {
 } from '@cloudscape-design/components';
 import Layout from '../../components/Layout/Layout';
 
+// Base path for the application
+const BASE_PATH = '/item-helper-app';
+
 const DashboardPage: React.FC = () => {
   const breadcrumbs = (
-    <BreadcrumbGroup items={[{ text: 'Home', href: '/' }]} />
+    <BreadcrumbGroup items={[{ text: 'Home', href: `${BASE_PATH}/` }]} />
   );
 
   return (
-    <Layout activeHref="/" breadcrumbs={breadcrumbs}>
+    <Layout activeHref={`${BASE_PATH}/`} breadcrumbs={breadcrumbs}>
       <SpaceBetween size="l">
         <Container>
           <Header variant="h1">Cert Item Helper Dashboard</Header>
@@ -47,22 +50,22 @@ const DashboardPage: React.FC = () => {
             {
               name: 'Exam Items',
               description: 'Manage and organize your certification exam questions and answers.',
-              href: '/exam-items',
+              href: `${BASE_PATH}/exam-items`,
             },
             {
               name: 'Practice Tests',
               description: 'Create and take practice tests to prepare for your certification exams.',
-              href: '/practice-tests',
+              href: `${BASE_PATH}/practice-tests`,
             },
             {
               name: 'Reports',
               description: 'View analytics and performance reports on your practice test results.',
-              href: '/reports',
+              href: `${BASE_PATH}/reports`,
             },
             {
               name: 'Settings',
               description: 'Configure application settings and preferences.',
-              href: '/settings',
+              href: `${BASE_PATH}/settings`,
             },
           ]}
         />
